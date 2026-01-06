@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import "forge-std/console.sol";
+
 interface IUniswapV2Router02 {
     function swapExactTokensForTokens(
         uint amountIn,
@@ -20,11 +22,16 @@ interface IUniswapV2Router02 {
 
     function swapTokensForExactTokens(
         uint256 amountOut,
-        uint256 maxAmountIn,
+        uint256 amountInMax,
         address[] calldata path,
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
+
+    function getAmountsIn(
+        uint256 amountOut,
+        address[] calldata path
+    ) external view returns (uint256[] memory amounts);
 }
 
 contract UsdcToUsdtExactInSwap {
@@ -80,44 +87,48 @@ contract UsdcToUsdtExactInSwap {
             to,
             deadline
         );
-
         // 6) return final output
         return amounts[1];
     }
 
     function swapExactOut(
         uint256 amountOut,
-        uint256 maxAmountIn,
         address to,
+        uint256 slippageBps,
         uint256 deadline
     ) external returns (uint256 amountIn) {
-        if (amountOut == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
-
-        IERC20(USDC).safeTransferFrom(msg.sender, address(this), maxAmountIn);
-
-        IERC20(USDC).forceApprove(address(router), maxAmountIn);
+        if (slippageBps > 10000) revert SlippageTooHigh();
 
         address[] memory path = new address[](2);
         path[0] = USDC;
         path[1] = USDT;
 
+        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(
+            amountOut,
+            path
+        );
+        uint256 amountInMax = (minimumAmountThatNeedsToBeSpent[0] *
+            (10000 + slippageBps)) / 10000;
+
+        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amountInMax);
+
+        IERC20(USDC).forceApprove(address(router), amountInMax);
+
         uint256[] memory amounts = router.swapTokensForExactTokens(
             amountOut,
-            maxAmountIn,
+            amountInMax,
             path,
             to,
             deadline
         );
 
-        return amounts[0];
-    }
-    function quoteUsdcToUsdt(uint256 amountIn) external view returns (uint256) {
-        address[] memory path = new address[](2);
-        path[0] = USDC;
-        path[1] = USDT;
+        uint256 leftover = amountInMax - amounts[0];
+        if (leftover > 0) {
+            IERC20(USDC).safeTransfer(msg.sender, leftover);
+        }
+        IERC20(USDC).forceApprove(address(router), 0);
 
-        uint256[] memory amounts = router.getAmountsOut(amountIn, path);
-        return amounts[1];
+        return amounts[0];
     }
 }
