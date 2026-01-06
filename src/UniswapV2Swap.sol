@@ -37,7 +37,6 @@ contract UsdcToUsdtExactInSwap {
     address public immutable USDC;
     address public immutable USDT;
     IUniswapV2Router02 public immutable router;
-
     constructor(address _router, address _usdc, address _usdt) {
         router = IUniswapV2Router02(_router);
         USDC = _usdc;

@@ -67,10 +67,11 @@ User swaps 100 USDC → USDT again
 User receives fewer USDT due to price impact
 
 Bot swaps USDT → USDC (back-run)
+```
 
 This mirrors how real MEV bots operate on Ethereum mainnet.
 
-🛠 Tech stack
+## 🛠 Tech stack
 Solidity ^0.8.20
 
 Foundry
@@ -81,22 +82,16 @@ OpenZeppelin (IERC20, SafeERC20)
 
 Mainnet fork testing
 
-🚀 Running the project
+## 🚀 Running the project
 1. Install dependencies
-bash
-Copy code
 forge install
 2. Set up environment
 Create a .env file:
-
-env
-Copy code
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 3. Run tests on mainnet fork
-bash
-Copy code
-forge test --fork-url $MAINNET_RPC_URL -vv
-⚠️ Important notes
+forge test --fork-url $MAINNET_RPC_URL
+
+## ⚠️ Important notes
 This project is educational, not production-ready
 
 It intentionally demonstrates how users can be harmed
@@ -109,7 +104,7 @@ or smart routing / aggregators
 
 Solidity alone cannot fully prevent MEV
 
-🧭 Next steps (planned)
+## 🧭 Next steps (planned)
 Add frontend (React + ethers / viem)
 
 Add quote function for slippage estimation
@@ -120,7 +115,7 @@ Compare public vs private execution paths
 
 Extend to Uniswap V3
 
-📚 Learning goals
+## 📚 Learning goals
 This repo exists to build deep intuition, not just working code.
 
 If you understand this project, you understand:
@@ -133,33 +128,5 @@ MEV basics
 
 Why frontend & infra matter in DeFi
 
-📝 License
+## 📝 License
 MIT
-
-markdown
-Copy code
-
----
-
-## 🧠 Why this README is structured this way
-
-- **What’s inside** → reviewers instantly know what to look at
-- **Concepts covered** → shows *understanding*, not just code
-- **How the test works** → proves you understand MEV mechanics
-- **Important notes** → shows maturity (not overclaiming security)
-- **Next steps** → signals roadmap thinking
-
-This is exactly how strong Web3 repos are written.
-
----
-
-## ✅ Next suggestions (pick one)
-
-We can now:
-1. 🧩 Refactor the contract for **production readiness**
-2. 🌐 Start a **frontend swap UI**
-3. 🔒 Add **slippage failure tests**
-4. 🧠 Write a **blog-style explanation of the sandwich attack**
-5. ⚡ Move to **Uniswap V3**
-
-Tell me what you want to do next — you’ve earned it 🚀
