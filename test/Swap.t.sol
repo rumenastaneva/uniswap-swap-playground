@@ -121,4 +121,16 @@ contract SwapTest is Test {
 
         assertLt(usdcSpentDuringSwap, allowedMaxSpend);
     }
+
+    function testSwapExactOut_RevertOnDeadlineExpired() public {
+        vm.deal(NINO, 10 ether);
+        vm.startPrank(NINO);
+
+        uint256 amountOut = 1_000e6;
+        uint256 slippageBps = 50;
+        uint256 deadline = block.timestamp - 1; // already expired
+
+        vm.expectRevert(abi.encodeWithSignature("DeadlineExpired()"));
+        swap.swapExactOut(amountOut, NINO, slippageBps, deadline);
+    }
 }
