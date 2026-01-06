@@ -26,7 +26,14 @@ contract SwapTest is Test {
     UsdcToUsdtExactInSwap swap;
     IUniswapV2Router02 router;
 
+    function _skipIfNotForked() internal {
+        if (USDC.code.length == 0 || USDT.code.length == 0 || UNIV2_ROUTER.code.length == 0) {
+            vm.skip(true);
+        }
+    }
+
     function setUp() public {
+        _skipIfNotForked();
         swap = new UsdcToUsdtExactInSwap(UNIV2_ROUTER, USDC, USDT);
         router = IUniswapV2Router02(UNIV2_ROUTER);
     }

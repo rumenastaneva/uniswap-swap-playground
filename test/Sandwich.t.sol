@@ -38,6 +38,12 @@ contract SandwichTest is Test {
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
 
+    function setUp() public {
+        if (USDC.code.length == 0 || USDT.code.length == 0 || UNIV2_ROUTER.code.length == 0) {
+            vm.skip(true);
+        }
+    }
+
     function testSandwichHurtsUser() public {
         vm.deal(USER, 10 ether); // accounts need to have ether in order to pay gas
         vm.deal(BOT, 10 ether);
