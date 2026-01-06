@@ -3,9 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    SafeERC20
-} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {UsdcToUsdtExactInSwap} from "../src/UniswapV2Swap.sol";
 
@@ -23,12 +21,12 @@ import {UsdcToUsdtExactInSwap} from "../src/UniswapV2Swap.sol";
 
 interface IUniswapV2RouterLike {
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
 }
 
 contract SandwichTest is Test {
@@ -44,11 +42,7 @@ contract SandwichTest is Test {
         vm.deal(USER, 10 ether); // accounts need to have ether in order to pay gas
         vm.deal(BOT, 10 ether);
 
-        UsdcToUsdtExactInSwap swap = new UsdcToUsdtExactInSwap(
-            UNIV2_ROUTER,
-            USDC,
-            USDT
-        );
+        UsdcToUsdtExactInSwap swap = new UsdcToUsdtExactInSwap(UNIV2_ROUTER, USDC, USDT);
 
         uint256 amountInUser = 1_00e6; // 100 USDC
         uint256 amountInBot = 1_000e6; // 1000 USDC
@@ -56,36 +50,21 @@ contract SandwichTest is Test {
         uint256 deadline = block.timestamp + 10 minutes;
 
         // User does their swap
-        uint256 baselineOutUser = userSwap(
-            amountInUser,
-            slippage,
-            deadline,
-            swap,
-            USER
-        );
+        uint256 baselineOutUser = userSwap(amountInUser, slippage, deadline, swap, USER);
         // Bot does their sandwich swap
         uint256 botSwapAmount = botUsingUniswapRouter(amountInBot, deadline);
         // User does their swap again, but this time after the bot has sandwiched them
-        uint256 userUsdtBalanceAfterSandwich = userSwap(
-            amountInUser,
-            slippage,
-            deadline,
-            swap,
-            USER
-        );
+        uint256 userUsdtBalanceAfterSandwich = userSwap(amountInUser, slippage, deadline, swap, USER);
 
         assertLt(userUsdtBalanceAfterSandwich, baselineOutUser);
         // Bot sells usdt back to usdc
         botBackRun(botSwapAmount, deadline);
     }
 
-    function userSwap(
-        uint256 amountIn,
-        uint256 slippage,
-        uint256 deadline,
-        UsdcToUsdtExactInSwap swap,
-        address actor
-    ) internal returns (uint256 usdtGained) {
+    function userSwap(uint256 amountIn, uint256 slippage, uint256 deadline, UsdcToUsdtExactInSwap swap, address actor)
+        internal
+        returns (uint256 usdtGained)
+    {
         vm.startPrank(actor);
         uint256 usdtBeforeSwap = IERC20(USDT).balanceOf(actor);
 
@@ -105,10 +84,7 @@ contract SandwichTest is Test {
         path[1] = USDT;
     }
 
-    function botUsingUniswapRouter(
-        uint256 amount,
-        uint256 deadline
-    ) internal returns (uint256 usdtGained) {
+    function botUsingUniswapRouter(uint256 amount, uint256 deadline) internal returns (uint256 usdtGained) {
         vm.startPrank(BOT);
         uint256 usdtBefore = IERC20(USDT).balanceOf(BOT);
 

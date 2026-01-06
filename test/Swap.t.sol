@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UsdcToUsdtExactInSwap} from "../src/UniswapV2Swap.sol";
 
 interface IUniswapV2Router02 {
-    function getAmountsIn(
-        uint256 amountOut,
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
+    function getAmountsIn(uint256 amountOut, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
 }
 
 contract SwapTest is Test {
@@ -69,13 +69,9 @@ contract SwapTest is Test {
         path[0] = USDC;
         path[1] = USDT;
 
-        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(
-            amountOut,
-            path
-        );
+        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(amountOut, path);
 
-        uint256 maxAmountIn = (minimumAmountThatNeedsToBeSpent[0] *
-            (10000 + slippageBps)) / 10000;
+        uint256 maxAmountIn = (minimumAmountThatNeedsToBeSpent[0] * (10000 + slippageBps)) / 10000;
         IERC20(USDC).forceApprove(address(swap), maxAmountIn);
 
         swap.swapExactOut(amountOut, NINO, slippageBps, deadline);

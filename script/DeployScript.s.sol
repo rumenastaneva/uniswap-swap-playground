@@ -19,11 +19,7 @@ contract DeployScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        usdcToUsdtExactInSwap = new UsdcToUsdtExactInSwap(
-            uniswapV2Router,
-            usdc,
-            usdt
-        );
+        usdcToUsdtExactInSwap = new UsdcToUsdtExactInSwap(uniswapV2Router, usdc, usdt);
 
         vm.stopBroadcast();
     }

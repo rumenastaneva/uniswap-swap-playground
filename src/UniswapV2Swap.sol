@@ -8,17 +8,17 @@ import "forge-std/console.sol";
 
 interface IUniswapV2Router02 {
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
 
-    function getAmountsOut(
-        uint amountIn,
-        address[] calldata path
-    ) external view returns (uint[] memory amounts);
+    function getAmountsOut(uint256 amountIn, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
 
     function swapTokensForExactTokens(
         uint256 amountOut,
@@ -28,10 +28,10 @@ interface IUniswapV2Router02 {
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
-    function getAmountsIn(
-        uint256 amountOut,
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
+    function getAmountsIn(uint256 amountOut, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
 }
 
 contract UsdcToUsdtExactInSwap {
@@ -44,6 +44,7 @@ contract UsdcToUsdtExactInSwap {
     address public immutable USDC;
     address public immutable USDT;
     IUniswapV2Router02 public immutable router;
+
     constructor(address _router, address _usdc, address _usdt) {
         router = IUniswapV2Router02(_router);
         USDC = _usdc;
@@ -55,12 +56,10 @@ contract UsdcToUsdtExactInSwap {
     /// @param slippageBps maximum slippage allowed (in basis points, 10000 = 100%)
     /// @param to receiver of USDT (usually msg.sender)
     /// @param deadline unix timestamp after which the tx reverts
-    function swapExactIn(
-        uint256 amountIn,
-        uint256 slippageBps,
-        address to,
-        uint256 deadline
-    ) external returns (uint256 amountOut) {
+    function swapExactIn(uint256 amountIn, uint256 slippageBps, address to, uint256 deadline)
+        external
+        returns (uint256 amountOut)
+    {
         // 1) validate inputs
         if (amountIn == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
@@ -80,23 +79,15 @@ contract UsdcToUsdtExactInSwap {
         uint256 minAmountOut = (amountIn * (10000 - slippageBps)) / 10000; // calculate min amount out based on slippage
 
         // 5) call router
-        uint256[] memory amounts = router.swapExactTokensForTokens(
-            amountIn,
-            minAmountOut,
-            path,
-            to,
-            deadline
-        );
+        uint256[] memory amounts = router.swapExactTokensForTokens(amountIn, minAmountOut, path, to, deadline);
         // 6) return final output
         return amounts[1];
     }
 
-    function swapExactOut(
-        uint256 amountOut,
-        address to,
-        uint256 slippageBps,
-        uint256 deadline
-    ) external returns (uint256 amountIn) {
+    function swapExactOut(uint256 amountOut, address to, uint256 slippageBps, uint256 deadline)
+        external
+        returns (uint256 amountIn)
+    {
         if (block.timestamp > deadline) revert DeadlineExpired();
         if (slippageBps > 10000) revert SlippageTooHigh();
 
@@ -104,24 +95,14 @@ contract UsdcToUsdtExactInSwap {
         path[0] = USDC;
         path[1] = USDT;
 
-        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(
-            amountOut,
-            path
-        );
-        uint256 amountInMax = (minimumAmountThatNeedsToBeSpent[0] *
-            (10000 + slippageBps)) / 10000;
+        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(amountOut, path);
+        uint256 amountInMax = (minimumAmountThatNeedsToBeSpent[0] * (10000 + slippageBps)) / 10000;
 
         IERC20(USDC).safeTransferFrom(msg.sender, address(this), amountInMax);
 
         IERC20(USDC).forceApprove(address(router), amountInMax);
 
-        uint256[] memory amounts = router.swapTokensForExactTokens(
-            amountOut,
-            amountInMax,
-            path,
-            to,
-            deadline
-        );
+        uint256[] memory amounts = router.swapTokensForExactTokens(amountOut, amountInMax, path, to, deadline);
 
         uint256 leftover = amountInMax - amounts[0];
         if (leftover > 0) {
