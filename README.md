@@ -116,17 +116,62 @@ Compare public vs private execution paths
 Extend to Uniswap V3
 
 ## 📚 Learning goals
-This repo exists to build deep intuition, not just working code.
 
-If you understand this project, you understand:
+This repository is a hands-on learning playground with the following goals:
 
-Uniswap swaps
+### Smart contract fundamentals
+- Understand ERC20 mechanics (balances, allowances, `transferFrom`)
+- Build safe wrapper contracts around existing protocols (Uniswap V2)
+- Work with non-standard ERC20 tokens (USDC, USDT) using `SafeERC20`
+- Implement exact-in and exact-out swap patterns
+- Reason about token ownership and approval flows
 
-ERC20 approvals
+### Generalized swapping
+- Extend the swap contract to work with **any ERC20 token pair**
+- Support dynamic swap paths (e.g. tokenA → WETH → tokenB)
+- Add quote functions to estimate output before swapping
+- Handle token decimals correctly across different tokens
+- Design reusable and composable swap interfaces
 
-MEV basics
+### Slippage & safety
+- Implement configurable slippage protection
+- Understand why slippage is a **user responsibility**
+- Compare “safe defaults” vs “dangerous defaults”
+- Write tests that assert slippage-related invariants
 
-Why frontend & infra matter in DeFi
+### MEV & protocol behavior
+- Understand how Uniswap pricing and price impact work
+- Simulate MEV sandwich attacks on a mainnet fork
+- Prove user harm with concrete invariants
+- Learn why MEV cannot be fully prevented in Solidity
+- Explore mitigation strategies (private txs, tighter slippage)
+
+### Testing & tooling
+- Use Foundry with mainnet forks
+- Impersonate real accounts in tests
+- Write scenario-based tests, not just unit tests
+- Debug failing mainnet interactions
+- Understand remappings and dependency management
+
+### Frontend & dApp integration (next phase)
+- Build a simple frontend for swapping tokens
+- Learn how a frontend:
+  - requests token approvals
+  - estimates gas and slippage
+  - submits transactions
+  - handles pending / failed txs
+- Connect frontend to contracts using ethers / viem
+- Understand how UX decisions affect user safety
+
+### Full-stack Web3 thinking
+- See how smart contracts, frontend, and infra interact
+- Understand what must live on-chain vs off-chain
+- Learn why many security decisions belong in the frontend
+- Build intuition for production-ready DeFi design
+
+This project is intentionally iterative:  
+it starts with a single USDC → USDT swap and grows toward a **general-purpose swap dApp** with a strong security mindset.
+
 
 ## 📝 License
 MIT
