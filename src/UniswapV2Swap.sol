@@ -76,7 +76,10 @@ contract UsdcToUsdtExactInSwap {
         path[0] = USDC;
         path[1] = USDT;
 
-        uint256 minAmountOut = (amountIn * (10000 - slippageBps)) / 10000; // calculate min amount out based on slippage
+        // get quoted amount out for slippage calculation
+        uint256[] memory quotedAmountsOut = router.getAmountsOut(amountIn, path);
+
+        uint256 minAmountOut = (quotedAmountsOut[1] * (10000 - slippageBps)) / 10000; // calculate min amount out based on slippage
 
         // 5) call router
         uint256[] memory amounts = router.swapExactTokensForTokens(amountIn, minAmountOut, path, to, deadline);
