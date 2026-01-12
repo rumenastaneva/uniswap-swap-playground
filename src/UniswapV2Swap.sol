@@ -84,6 +84,11 @@ contract UsdcToUsdtExactInSwap {
         return amounts[1];
     }
 
+    /// @notice Swap USDC in for exact USDT out (slippage protected by maxIn)
+    /// @param amountOut exact amount of USDT the user wants to receive (USDT has 6 decimals)
+    /// @param to receiver of USDT (usually msg.sender)
+    /// @param slippageBps maximum slippage allowed (in basis points, 10000 = 100%)
+    /// @param deadline unix timestamp after which the tx reverts
     function swapExactOut(uint256 amountOut, address to, uint256 slippageBps, uint256 deadline)
         external
         returns (uint256 amountIn)
