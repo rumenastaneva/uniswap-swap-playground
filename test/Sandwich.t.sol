@@ -61,10 +61,10 @@ contract SandwichTest is Test {
         address[] memory path = pathBuilder(); // [USDC, USDT]
 
         // baseline on clean state
-        uint256 snap = vm.snapshot();
+        uint256 snap = vm.snapshotState();
         uint256 baselineMinOut = minOutFromQuote(amountInUser, path, slippageBps);
         uint256 baselineOut = swapViaRouter(USER, USDC, USDT, amountInUser, baselineMinOut, path, deadline);
-        vm.revertTo(snap);
+        vm.revertToState(snap);
 
         // "real user": computes minOut BEFORE attack (stale quote)
         uint256 staleMinOut = minOutFromQuote(amountInUser, path, slippageBps);
