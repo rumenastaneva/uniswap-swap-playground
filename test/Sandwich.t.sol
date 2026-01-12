@@ -27,6 +27,11 @@ interface IUniswapV2RouterLike {
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
+
+    function getAmountsOut(uint256 amountIn, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
 }
 
 contract SandwichTest is Test {
@@ -45,86 +50,77 @@ contract SandwichTest is Test {
     }
 
     function testSandwichHurtsUser() public {
-        vm.deal(USER, 10 ether); // accounts need to have ether in order to pay gas
+        vm.deal(USER, 10 ether);
         vm.deal(BOT, 10 ether);
 
-        UsdcToUsdtExactInSwap swap = new UsdcToUsdtExactInSwap(UNIV2_ROUTER, USDC, USDT);
-
-        uint256 amountInUser = 1_00e6; // 100 USDC
-        uint256 amountInBot = 1_000e6; // 1000 USDC
-        uint256 slippage = 50; // 0.5% slippage
+        uint256 amountInUser = 100e6; // 100 USDC
+        uint256 amountInBot = IERC20(USDC).balanceOf(BOT) / 2; // half of bot's USDC
+        uint256 slippageBps = 50; // 0.50%
         uint256 deadline = block.timestamp + 10 minutes;
 
-        // User does their swap
-        uint256 baselineOutUser = userSwap(amountInUser, slippage, deadline, swap, USER);
-        // Bot does their sandwich swap
-        uint256 botSwapAmount = botUsingUniswapRouter(amountInBot, deadline);
-        // User does their swap again, but this time after the bot has sandwiched them
-        uint256 userUsdtBalanceAfterSandwich = userSwap(amountInUser, slippage, deadline, swap, USER);
+        address[] memory path = pathBuilder(); // [USDC, USDT]
 
-        assertLt(userUsdtBalanceAfterSandwich, baselineOutUser);
-        // Bot sells usdt back to usdc
-        botBackRun(botSwapAmount, deadline);
+        // baseline on clean state
+        uint256 snap = vm.snapshot();
+        uint256 baselineMinOut = minOutFromQuote(amountInUser, path, slippageBps);
+        uint256 baselineOut = swapViaRouter(USER, USDC, USDT, amountInUser, baselineMinOut, path, deadline);
+        vm.revertTo(snap);
+
+        // "real user": computes minOut BEFORE attack (stale quote)
+        uint256 staleMinOut = minOutFromQuote(amountInUser, path, slippageBps);
+
+        // bot front-runs (moves price)
+        uint256 botUsdt = swapViaRouter(BOT, USDC, USDT, amountInBot, 0, path, deadline);
+
+        // user executes with staleMinOut AFTER price moved
+        uint256 sandwichedOut = swapViaRouter(USER, USDC, USDT, amountInUser, staleMinOut, path, deadline);
+
+        assertLt(sandwichedOut, baselineOut);
+
+        // bot back-runs: USDT -> USDC
+        address[] memory backPath = new address[](2);
+        backPath[0] = USDT;
+        backPath[1] = USDC;
+
+        swapViaRouter(BOT, USDT, USDC, botUsdt, 1, backPath, deadline);
     }
 
-    function userSwap(uint256 amountIn, uint256 slippage, uint256 deadline, UsdcToUsdtExactInSwap swap, address actor)
+    function minOutFromQuote(uint256 amountIn, address[] memory path, uint256 slippageBps)
         internal
-        returns (uint256 usdtGained)
+        view
+        returns (uint256 minOut)
     {
+        uint256 quotedOut = IUniswapV2RouterLike(UNIV2_ROUTER).getAmountsOut(amountIn, path)[path.length - 1];
+
+        // keep (100% - slippage)
+        minOut = (quotedOut * (10_000 - slippageBps)) / 10_000;
+    }
+
+    function swapViaRouter(
+        address actor,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] memory path,
+        uint256 deadline
+    ) internal returns (uint256 out) {
         vm.startPrank(actor);
-        uint256 usdtBeforeSwap = IERC20(USDT).balanceOf(actor);
 
-        // user approves our swap contract to swap their usdc
-        IERC20(USDC).forceApprove(address(swap), amountIn);
+        uint256 beforeBal = IERC20(tokenOut).balanceOf(actor);
+        IERC20(tokenIn).forceApprove(UNIV2_ROUTER, amountIn);
 
-        swap.swapExactIn(amountIn, slippage, actor, deadline);
+        IUniswapV2RouterLike(UNIV2_ROUTER).swapExactTokensForTokens(amountIn, amountOutMin, path, actor, deadline);
 
-        uint256 usdtAfterSwap = IERC20(USDT).balanceOf(actor);
+        uint256 afterBal = IERC20(tokenOut).balanceOf(actor);
         vm.stopPrank();
-        usdtGained = usdtAfterSwap - usdtBeforeSwap;
+
+        out = afterBal - beforeBal;
     }
 
     function pathBuilder() internal pure returns (address[] memory path) {
         path = new address[](2);
         path[0] = USDC;
         path[1] = USDT;
-    }
-
-    function botUsingUniswapRouter(uint256 amount, uint256 deadline) internal returns (uint256 usdtGained) {
-        vm.startPrank(BOT);
-        uint256 usdtBefore = IERC20(USDT).balanceOf(BOT);
-
-        address[] memory path = pathBuilder();
-        IERC20(USDC).forceApprove(UNIV2_ROUTER, amount);
-
-        IUniswapV2RouterLike(UNIV2_ROUTER).swapExactTokensForTokens(
-            amount,
-            0, // accept any amount of usdt, because he wants to not have a fair trade, he wants to sandwich the user and make profit off the price impact
-            path,
-            BOT,
-            deadline
-        );
-
-        uint256 usdtAfter = IERC20(USDT).balanceOf(BOT);
-        vm.stopPrank();
-        usdtGained = usdtAfter - usdtBefore;
-    }
-
-    function botBackRun(uint256 usdtAmount, uint256 deadline) internal {
-        vm.startPrank(BOT);
-        address[] memory path = new address[](2);
-        path[0] = USDT;
-        path[1] = USDC;
-
-        IERC20(USDT).forceApprove(UNIV2_ROUTER, usdtAmount);
-
-        IUniswapV2RouterLike(UNIV2_ROUTER).swapExactTokensForTokens(
-            usdtAmount,
-            1, // accept any amount of usdc
-            path,
-            BOT,
-            deadline
-        );
-        vm.stopPrank();
     }
 }
