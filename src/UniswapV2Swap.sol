@@ -48,10 +48,29 @@ contract UniV2Swapper {
         router = IUniswapV2Router02(_router);
     }
 
-    function swapExactIn(uint256 amountIn, uint256 slippageBps, address to, uint256 deadline, address[] calldata path)
-        external
-        returns (uint256 amountOut)
-    {
+    struct SwapExactInParams {
+        uint256 amountIn;
+        uint256 slippageBps;
+        address to;
+        uint256 deadline;
+        address[] path;
+    }
+
+    struct SwapExactOutParams {
+        uint256 amountOut;
+        uint256 slippageBps;
+        address to;
+        uint256 deadline;
+        address[] path;
+    }
+
+    function swapExactIn(SwapExactInParams calldata params) external returns (uint256 amountOut) {
+        uint256 amountIn = params.amountIn;
+        uint256 slippageBps = params.slippageBps;
+        address to = params.to;
+        uint256 deadline = params.deadline;
+        address[] calldata path = params.path;
+
         // 1) validate inputs
         if (amountIn == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
@@ -80,10 +99,13 @@ contract UniV2Swapper {
         return amounts[amounts.length - 1];
     }
 
-    function swapExactOut(uint256 amountOut, address to, uint256 slippageBps, uint256 deadline, address[] calldata path)
-        external
-        returns (uint256 amountIn)
-    {
+    function swapExactOut(SwapExactOutParams calldata params) external returns (uint256 amountIn) {
+        uint256 amountOut = params.amountOut;
+        uint256 slippageBps = params.slippageBps;
+        address to = params.to;
+        uint256 deadline = params.deadline;
+        address[] calldata path = params.path;
+
         if (amountOut == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
         if (slippageBps > 10000) revert SlippageTooHigh();
