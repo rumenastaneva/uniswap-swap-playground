@@ -34,29 +34,21 @@ interface IUniswapV2Router02 {
         returns (uint256[] memory amounts);
 }
 
-contract UsdcToUsdtExactInSwap {
+contract UniV2Swapper {
     using SafeERC20 for IERC20;
 
     error DeadlineExpired();
     error ZeroAmount();
     error SlippageTooHigh();
+    error InvalidPath();
 
-    address public immutable USDC;
-    address public immutable USDT;
     IUniswapV2Router02 public immutable router;
 
-    constructor(address _router, address _usdc, address _usdt) {
+    constructor(address _router) {
         router = IUniswapV2Router02(_router);
-        USDC = _usdc;
-        USDT = _usdt;
     }
 
-    /// @notice Swap exact USDC in for USDT out (slippage protected by minOut)
-    /// @param amountIn exact amount of USDC the user spends (USDC has 6 decimals)
-    /// @param slippageBps maximum slippage allowed (in basis points, 10000 = 100%)
-    /// @param to receiver of USDT (usually msg.sender)
-    /// @param deadline unix timestamp after which the tx reverts
-    function swapExactIn(uint256 amountIn, uint256 slippageBps, address to, uint256 deadline)
+    function swapExactIn(uint256 amountIn, uint256 slippageBps, address to, uint256 deadline, address[] calldata path)
         external
         returns (uint256 amountOut)
     {
@@ -64,60 +56,93 @@ contract UsdcToUsdtExactInSwap {
         if (amountIn == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
         if (slippageBps > 10000) revert SlippageTooHigh();
+        if (path.length < 2) revert InvalidPath();
+        if (to == address(0)) revert InvalidPath();
+        if (path[0] == address(0) || path[path.length - 1] == address(0)) revert InvalidPath();
 
-        // 2) pull USDC from user
-        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amountIn);
+        (address tokenIn, address tokenOut) = determineTokenInAndOut(path);
 
-        // 3) approve router
-        IERC20(USDC).forceApprove(address(router), amountIn);
+        // 2) transfer tokens from user to this contract
+        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
-        // 4) build path
-        address[] memory path = new address[](2);
-        path[0] = USDC;
-        path[1] = USDT;
+        // 3) approve router to spend tokens
+        IERC20(tokenIn).forceApprove(address(router), amountIn);
 
-        // get quoted amount out for slippage calculation
-        uint256[] memory quotedAmountsOut = router.getAmountsOut(amountIn, path);
+        // 4) get quoted amount out
+        uint256 quotedAmountOut = getQuotedAmountOut(amountIn, path);
+        uint256 minAmountOut = (quotedAmountOut * (10000 - slippageBps)) / 10000;
 
-        uint256 minAmountOut = (quotedAmountsOut[1] * (10000 - slippageBps)) / 10000; // calculate min amount out based on slippage
-
-        // 5) call router
+        // 5) perform the swap
         uint256[] memory amounts = router.swapExactTokensForTokens(amountIn, minAmountOut, path, to, deadline);
-        // 6) return final output
-        return amounts[1];
+
+        IERC20(tokenIn).forceApprove(address(router), 0);
+
+        return amounts[amounts.length - 1];
     }
 
-    /// @notice Swap USDC in for exact USDT out (slippage protected by maxIn)
-    /// @param amountOut exact amount of USDT the user wants to receive (USDT has 6 decimals)
-    /// @param to receiver of USDT (usually msg.sender)
-    /// @param slippageBps maximum slippage allowed (in basis points, 10000 = 100%)
-    /// @param deadline unix timestamp after which the tx reverts
-    function swapExactOut(uint256 amountOut, address to, uint256 slippageBps, uint256 deadline)
+    function swapExactOut(uint256 amountOut, address to, uint256 slippageBps, uint256 deadline, address[] calldata path)
         external
         returns (uint256 amountIn)
     {
+        if (amountOut == 0) revert ZeroAmount();
         if (block.timestamp > deadline) revert DeadlineExpired();
         if (slippageBps > 10000) revert SlippageTooHigh();
+        if (path.length < 2) revert InvalidPath();
+        if (to == address(0)) revert InvalidPath();
+        if (path[0] == address(0) || path[path.length - 1] == address(0)) revert InvalidPath();
 
-        address[] memory path = new address[](2);
-        path[0] = USDC;
-        path[1] = USDT;
+        (address tokenIn, address tokenOut) = determineTokenInAndOut(path);
 
-        uint256[] memory minimumAmountThatNeedsToBeSpent = router.getAmountsIn(amountOut, path);
-        uint256 amountInMax = (minimumAmountThatNeedsToBeSpent[0] * (10000 + slippageBps)) / 10000;
+        // 1) get quoted amount in
+        uint256 quotedAmountIn = getQuotedAmountIn(amountOut, path);
+        uint256 maxAmountIn = (quotedAmountIn * (10000 + slippageBps)) / 10000;
 
-        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amountInMax);
+        // 2) transfer tokens from user to this contract
+        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), maxAmountIn);
 
-        IERC20(USDC).forceApprove(address(router), amountInMax);
+        // 3) approve router to spend tokens
+        IERC20(tokenIn).forceApprove(address(router), maxAmountIn);
 
-        uint256[] memory amounts = router.swapTokensForExactTokens(amountOut, amountInMax, path, to, deadline);
+        // 4) perform the swap
+        uint256[] memory amounts = router.swapTokensForExactTokens(amountOut, maxAmountIn, path, to, deadline);
 
-        uint256 leftover = amountInMax - amounts[0];
-        if (leftover > 0) {
-            IERC20(USDC).safeTransfer(msg.sender, leftover);
+        // 5) refund excess tokens to user
+        uint256 actualAmountIn = amounts[0];
+        if (maxAmountIn > actualAmountIn) {
+            uint256 refundAmount = maxAmountIn - actualAmountIn;
+            IERC20(tokenIn).safeTransfer(msg.sender, refundAmount);
         }
-        IERC20(USDC).forceApprove(address(router), 0);
 
-        return amounts[0];
+        IERC20(tokenIn).forceApprove(address(router), 0);
+        return actualAmountIn;
+    }
+
+    function determineTokenInAndOut(address[] calldata path)
+        internal
+        pure
+        returns (address tokenIn, address tokenOut)
+    {
+        tokenIn = path[0];
+        tokenOut = path[path.length - 1];
+
+        return (tokenIn, tokenOut);
+    }
+
+    function getQuotedAmountOut(uint256 amountIn, address[] calldata path)
+        internal
+        view
+        returns (uint256 quotedAmountOut)
+    {
+        uint256[] memory amountsOut = router.getAmountsOut(amountIn, path);
+        return amountsOut[amountsOut.length - 1];
+    }
+
+    function getQuotedAmountIn(uint256 amountOut, address[] calldata path)
+        internal
+        view
+        returns (uint256 quotedAmountIn)
+    {
+        uint256[] memory amountsIn = router.getAmountsIn(amountOut, path);
+        return amountsIn[0];
     }
 }
