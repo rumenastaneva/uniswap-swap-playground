@@ -5,8 +5,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "forge-std/console.sol";
-
 contract RumibaToken is ERC20, Ownable {
     error ExceedsMaxSupply(uint256 requested, uint256 available);
 
